@@ -1,7 +1,8 @@
 """
 Interfaccia web del Business Game.
-Questo file sostituisce l'interfaccia Kivy e integra la logica completa
-delle schermate Guida e Mercato di main_2.py.
+Questo file sostituisce la vecchia interfaccia Kivy e integra la logica avanzata
+delle schermate Guida, Mercato (con grafici interattivi Dark Premium) e dei Report
+di Bilancio e Rendiconto di Cassa basati sui prospetti ufficiali della simulazione.
 
 Avvio locale:
     python main.py
@@ -73,7 +74,7 @@ th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left}
 th{background:#f6f8fb}
 .table-wrap{overflow:auto}
 pre{white-space:pre-wrap;word-break:break-word;font:14px/1.55 inherit;margin:0}
-canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;background:#1e1e1e}
+canvas{width:100%;height:230px;border:1px solid #334155;border-radius:12px;background:#0f172a;cursor:crosshair;box-shadow:0 4px 15px rgba(0,0,0,0.15)}
 .hidden{display:none!important}
 .badge{display:inline-block;border-radius:20px;padding:5px 9px;background:#edf2ff;color:#2446a0;font-size:12px;font-weight:700}
 .guide-text{font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-wrap}
@@ -248,10 +249,10 @@ canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;b
       <div class="section"><h3>Seleziona situazione</h3><select id="report-turn" onchange="aggiornaReport()"><option value="current">Situazione attuale</option></select></div>
       <div class="grid">
         <div class="section"><h3>Stato patrimoniale - Attivo</h3><div id="report-assets"></div></div>
-        <div class="section"><h3>Stato patrimoniale - Passivo</h3><div id="report-liabilities"></div></div>
+        <div class="section"><h3>Stato patrimoniale - Passivo e Patrimonio Netto</h3><div id="report-liabilities"></div></div>
       </div>
       <div class="section"><h3>Conto economico</h3><div id="report-income"></div></div>
-      <div class="section"><h3>Flussi di cassa</h3><div id="report-cashflow"></div></div>
+      <div class="section"><h3>Flussi di cassa (Rendiconto di Cassa)</h3><div id="report-cashflow"></div></div>
       <div class="section"><h3>Indici</h3><div id="report-ratios"></div></div>
     </div>
 
@@ -365,7 +366,7 @@ Modalità di ricerca:
 Per ciascun prodotto è possibile scegliere tra Ricerca Interna e Co-progettazione. Le due modalità utilizzano rapporti di conversione diversi definiti dall'amministratore del gioco.
 
 Ricerca Interna:
-L'azienda sviluppa autonomamente il prodotto. L'efficacia dell'investimento dipende dal rapporto 'Ricerca interna' impostato dall'amministratore. Il valore del rapporto verrà poi aggiunto a ricerca del prodotto al turno t+2 dove t è il turno attuale.
+L'azienda sviluppa autonomamente il prodotto. L'efficacia dell'investimento dipende dal rapporto 'Ricerca interna' impostato dall'amministratore. Il valore del rapporto verrà poi aggiunto a ricerca del prodotto al turno t+2 dove t è il turnoattuale.
 
 Co-progettazione:
 L'azienda sviluppa il prodotto insieme a partner esterni. Anche in questo caso l'incremento del livello di ricerca dipende dal rapporto 'Co-progettazione' definito dall'amministratore.
@@ -396,7 +397,7 @@ Investimenti correnti: Contengono la quota degli investimenti pluriennali che st
 TOTALE ATTIVO: Il totale dell'attivo è dato dalla somma di tutte le attività presenti nello Stato Patrimoniale.
 
 PASSIVO E PATRIMONIO NETTO
-Capitale sociale: Rappresenta il patrimonio netto dell'azienda. Nel turno iniziale è pari al capitale iniziale deciso dall'amministratore più il valore iniziale del magazzino materie prime.
+Capitale sociale: Rappresenta il patrimonio netto dell'azienda. Nel turno iniziale è pari al capitale iniziale deciso dall'amministratore più il valore iniziale del magazzino materie prime più l'utile accumulato.
 Debiti verso banche: Rappresentano la parte a medio-lungo termine dei finanziamenti ottenuti.
 Debiti correnti: Rappresentano la quota di finanziamenti che dovrà essere rimborsata nel breve periodo.
 
@@ -404,22 +405,33 @@ Debiti correnti: Rappresentano la quota di finanziamenti che dovrà essere rimbo
 CONTO ECONOMICO
 
 Il Conto Economico rappresenta il risultato della gestione aziendale durante un turno di gioco.
-VALORE DELLA PRODUZIONE: Ricavi di vendita e Variazione prodotti finiti.
-COSTI ESTERNI: Acquisto materie prime e Variazione materie prime.
-VALORE AGGIUNTO: Ricchezza generata dall'attività aziendale dopo i costi esterni.
-COSTO DEL PERSONALE: Costo sostenuto per i dipendenti e straordinari.
-MARGINE OPERATIVO LORDO (MOL / EBITDA): Risultato della gestione operativa prima degli ammortamenti.
-MARGINE OPERATIVO NETTO (MON / EBIT): MOL meno ammortamenti.
-UTILE D'ESERCIZIO: MON meno interessi passivi.
+VALORE DELLA PRODUZIONE: Ricavi di vendita (Prodotti A e B venduti x prezzi) e Variazione prodotti finiti (Valore magazzino PF finale - iniziale).
+COSTI ESTERNI: Acquisto materie prime (Quantità acquistata x costo unitario) e Variazione materie prime (Valore magazzino MP iniziale - finale).
+VALORE AGGIUNTO: Valore della Produzione - Costi Esterni.
+COSTO DEL PERSONALE: Dipendenti x costo unitario + straordinari x costo orario.
+MARGINE OPERATIVO LORDO (MOL / EBITDA): Valore Aggiunto - Costo del personale.
+MARGINE OPERATIVO NETTO (MON / EBIT): MOL - Ammortamenti (Quota d'esercizio degli investimenti pluriennali).
+UTILE D'ESERCIZIO: MON - Interessi (Costi finanziari sui finanziamenti bancari).
 
 
-FLUSSO DI CASSA
+FLUSSO DI CASSA (RENDICONTO DI CASSA)
 
-Il Flusso di Cassa mostra esclusivamente le entrate e le uscite monetarie che modificano la liquidità disponibile dell'impresa.
-GESTIONE OPERATIVA: Entrate da clienti meno uscite per fornitori, personale ed interessi.
-ATTIVITÀ DI INVESTIMENTO: Uscite per promozione, capacità produttiva e ricerca.
-ATTIVITÀ DI FINANZIAMENTO: Acquisizione nuovi debiti meno pagamento quote capitale debiti esistenti.
-CASSA FINALE: Liquidità totale disponibile al termine del turno.
+FLUSSO DI CASSA OPERATIVO
+Entrate da clienti: Incassi derivanti dalla vendita dei prodotti A e B.
+Uscite per fornitori: Uscite per acquisto materie prime.
+Uscite per personale: Uscite per retribuzioni e straordinari dipendenti.
+Interessi: Pagamento interessi relativi ai finanziamenti.
+
+FLUSSO DI CASSA DA INVESTIMENTI
+Promozione: Uscita per investimento in visibilità prodotti.
+Capacità produttiva: Uscita per investimento in aumento capacità.
+Ricerca e sviluppo: Uscita per investimento in sviluppo prodotti A e B.
+
+FLUSSO DI CASSA DA FINANZIAMENTO
+Acquisizione debiti: Entrate da nuovi finanziamenti bancari ottenuti.
+Pagamento debiti: Rimborso quota capitale finanziamenti precedenti.
+
+CASSA FINALE: Cassa Iniziale + Totale Entrate - Totale Uscite.
 
 
 INDICI ECONOMICO-FINANZIARI
@@ -447,6 +459,7 @@ Quota di Mercato = ((Venduto A / Domanda A) + (Venduto B / Domanda B)) / 2</div>
 const API = "";
 let stato = {room_code:"", company_name:"", admin_password:"", player:null, room:null, personnel:0};
 const $ = id => document.getElementById(id);
+const canvasState = {};
 
 async function api(url, method="GET", body=null) {
   const opt={method,headers:{"Content-Type":"application/json"}};
@@ -584,6 +597,9 @@ function tabella(obj,labels){
   return `<div class="table-wrap"><table>${rows}</table></div>`;
 }
 
+// =================================================================
+// REPORT (Aggiornato secondo il file PDF Prospetti di Bilancio)
+// =================================================================
 function aggiornaReport(){
   const p=stato.player||{},history=p.history||{},sel=$("report-turn").value||"current";
   let company=p.company||{},turn=p.current_turn||1;
@@ -594,20 +610,63 @@ function aggiornaReport(){
   const opts=['<option value="current">Situazione attuale</option>',...turns.map(t=>`<option value="${esc(t)}">Turno ${esc(t)}</option>`)];
   if(select.options.length!==opts.length)select.innerHTML=opts.join("");
   if([...select.options].some(o=>o.value===old))select.value=old;
-  $("report-assets").innerHTML=tabella(bs,{fixed_investments:"Investimenti fissi",cash:"Cassa",raw_material_inventory:"Magazzino materie prime",finished_goods_inventory:"Magazzino prodotti finiti",current_investments:"Investimenti correnti"});
-  $("report-liabilities").innerHTML=tabella(bs,{share_capital:"Capitale sociale",reserves:"Riserve",bank_debt_fixed:"Debiti bancari fissi",bank_debt_current:"Debiti bancari correnti"});
-  $("report-income").innerHTML=tabella(inc,{sales_revenue:"Ricavi di vendita",variation_finished_goods:"Variazione prodotti finiti",purchase_raw_materials:"Acquisto materie prime",variation_raw_materials:"Variazione materie prime",value_added:"Valore aggiunto",personnel_cost:"Costo personale",ebitda:"Margine operativo lordo",depreciation:"Ammortamenti",operating_income:"Margine operativo netto",interest:"Interessi",profit:"Utile"});
-  $("report-cashflow").innerHTML=tabella(cf,{inflows_from_customers:"Entrate da clienti",outflows_to_suppliers:"Uscite per fornitori",outflows_for_personnel:"Uscite per personale",cash_interest:"Interessi pagati",cash_promotion:"Promozione",cash_capacity:"Investimenti capacità",cash_research:"Ricerca",debt_acquisition:"Nuovi finanziamenti",debt_payment:"Rimborso debiti"});
+
+  // STATO PATRIMONIALE - ATTIVO
+  $("report-assets").innerHTML=tabella(bs,{
+    fixed_investments: "ATTIVO FISSO: Investimenti (promozione, capacità, R&S)",
+    cash: "ATTIVO CORRENTE: Cassa (liquidità disponibile)",
+    raw_material_inventory: "Magazzino materie prime",
+    finished_goods_inventory: "Magazzino prodotti finiti",
+    current_investments: "Investimenti correnti (quota in ammortamento)"
+  });
+
+  // STATO PATRIMONIALE - PASSIVO E PATRIMONIO NETTO
+  $("report-liabilities").innerHTML=tabella(bs,{
+    share_capital: "PATRIMONIO NETTO: Capitale sociale (capitale iniziale + magazzino MP iniziale + utile accumulato)",
+    reserves: "Riserve accumulate",
+    bank_debt_fixed: "DEBITI: Debiti verso banche (medio-lungo termine)",
+    bank_debt_current: "Debiti correnti (breve termine)"
+  });
+
+  // CONTO ECONOMICO
+  $("report-income").innerHTML=tabella(inc,{
+    sales_revenue: "VALORE DELLA PRODUZIONE: Ricavi di vendita (Prodotti A e B venduti x prezzi)",
+    variation_finished_goods: "Variazione prodotti finiti (Valore magazzino PF finale - iniziale)",
+    purchase_raw_materials: "COSTI ESTERNI: Acquisto materie prime (Quantità acquistata x costo unitario)",
+    variation_raw_materials: "Variazione materie prime (Valore magazzino MP finale - iniziale)",
+    value_added: "VALORE AGGIUNTO (Valore della Produzione - Costi Esterni)",
+    personnel_cost: "Costo del personale (Dipendenti x costo unitario + straordinari x costo orario)",
+    ebitda: "MARGINE OPERATIVO LORDO - MOL (Valore Aggiunto - Costo del personale)",
+    depreciation: "Ammortamenti (Quota d'esercizio degli investimenti pluriennali)",
+    operating_income: "MARGINE OPERATIVO NETTO - MON (MOL - Ammortamenti)",
+    interest: "Interessi (Costi finanziari sui finanziamenti bancari)",
+    profit: "UTILE D'ESERCIZIO (MON - Interessi)"
+  });
+
+  // FLUSSI DI CASSA (RENDICONTO DI CASSA)
+  $("report-cashflow").innerHTML=tabella(cf,{
+    inflows_from_customers: "FLUSSO DI CASSA OPERATIVO: Entrate da clienti (+ Incassi vendita prodotti A e B)",
+    outflows_to_suppliers: "Uscite per fornitori (- Acquisto materie prime)",
+    outflows_for_personnel: "Uscite per personale (- Retribuzioni e straordinari)",
+    cash_interest: "Interessi (- Pagamento interessi finanziamenti)",
+    cash_promotion: "FLUSSO DI CASSA DA INVESTIMENTI: Promozione (- Investimento in visibilità)",
+    cash_capacity: "Capacità produttiva (- Investimento in aumento capacità)",
+    cash_research: "Ricerca e sviluppo (- Investimento in sviluppo prodotti A e B)",
+    debt_acquisition: "FLUSSO DI CASSA DA FINANZIAMENTO: Acquisizione debiti (+ Nuovi finanziamenti)",
+    debt_payment: "Pagamento debiti (- Rimborso quota capitale finanziamenti precedenti)"
+  });
+
+  // INDICI
   const totalAssets=Number(bs.fixed_investments||0)+Number(bs.cash||0)+Number(bs.raw_material_inventory||0)+Number(bs.finished_goods_inventory||0)+Number(bs.current_investments||0);
   const debt=Number(bs.bank_debt_fixed||0)+Number(bs.bank_debt_current||0);
   const roe=Number(inc.profit||0)/(Number(bs.share_capital||0)||Infinity);
   const roi=Number(inc.operating_income||0)/(totalAssets||Infinity);
   const rod=Number(inc.interest||0)/(debt||Infinity);
-  $("report-ratios").innerHTML=tabella({roe,roi,rod,q:debt/(Number(bs.share_capital||0)||Infinity),s:Number(inc.profit||0)/(Number(inc.operating_income||0)||Infinity),leverage:roi-rod},{roe:"ROE",roi:"ROI",rod:"Costo indebitamento (ROD)",q:"Q",s:"S",leverage:"Leva"});
+  $("report-ratios").innerHTML=tabella({roe,roi,rod,q:debt/(Number(bs.share_capital||0)||Infinity),s:Number(inc.profit||0)/(Number(inc.operating_income||0)||Infinity),leverage:roi-rod},{roe:"ROE (Return On Equity)",roi:"ROI (Return On Investment)",rod:"Costo indebitamento (ROD)",q:"Indice Q (Grado di indebitamento)",s:"Indice S (Incidenza gestione finanziaria)",leverage:"Leva Finanziaria (ROI - ROD)"});
 }
 
 // =================================================================
-// MERCATO (Identico a main_2.py)
+// MERCATO (Restyling Dark Premium + Hover Interattivo)
 // =================================================================
 function stimaLineare(ini, fin, turno, maxTurns) {
   ini = Number(ini||0); fin = Number(fin||0);
@@ -640,8 +699,8 @@ function aggiornaMercato() {
   const demandA = pastTurns.map(t => Number(marketValA[t-1] || 0));
   const demandB = pastTurns.map(t => Number(marketValB[t-1] || 0));
 
-  disegnaGraficoAvanzato("chart-demand-a", pastTurns, demandA, "Domanda A", "#1a66ff");
-  disegnaGraficoAvanzato("chart-demand-b", pastTurns, demandB, "Domanda B", "#1a66ff");
+  disegnaGraficoAvanzato("chart-demand-a", pastTurns, demandA, "Domanda A", "#3b82f6");
+  disegnaGraficoAvanzato("chart-demand-b", pastTurns, demandB, "Domanda B", "#3b82f6");
 
   const avgPriceA = [], avgVisA = [], avgResA = [];
   const avgPriceB = [], avgVisB = [], avgResB = [];
@@ -658,78 +717,177 @@ function aggiornaMercato() {
     avgPriceB.push(calcolaMedia(pB)); avgVisB.push(calcolaMedia(vB)); avgResB.push(calcolaMedia(rB));
   });
 
-  disegnaGraficoAvanzato("chart-price-a", pastTurns, avgPriceA, "Prezzo medio A", "#ff4040");
-  disegnaGraficoAvanzato("chart-visibility-a", pastTurns, avgVisA, "Visibilità media A", "#00b33c");
-  disegnaGraficoAvanzato("chart-research-a", pastTurns, avgResA, "Ricerca media A", "#1a66ff");
+  disegnaGraficoAvanzato("chart-price-a", pastTurns, avgPriceA, "Prezzo medio A", "#ef4444");
+  disegnaGraficoAvanzato("chart-visibility-a", pastTurns, avgVisA, "Visibilità media A", "#10b981");
+  disegnaGraficoAvanzato("chart-research-a", pastTurns, avgResA, "Ricerca media A", "#8b5cf6");
 
-  disegnaGraficoAvanzato("chart-price-b", pastTurns, avgPriceB, "Prezzo medio B", "#ff4040");
-  disegnaGraficoAvanzato("chart-visibility-b", pastTurns, avgVisB, "Visibilità media B", "#00b33c");
-  disegnaGraficoAvanzato("chart-research-b", pastTurns, avgResB, "Ricerca media B", "#1a66ff");
+  disegnaGraficoAvanzato("chart-price-b", pastTurns, avgPriceB, "Prezzo medio B", "#ef4444");
+  disegnaGraficoAvanzato("chart-visibility-b", pastTurns, avgVisB, "Visibilità media B", "#10b981");
+  disegnaGraficoAvanzato("chart-research-b", pastTurns, avgResB, "Ricerca media B", "#8b5cf6");
 }
 
 function disegnaGraficoAvanzato(canvasId, xVals, yVals, label, colorHex) {
   const canvas = $(canvasId); if (!canvas) return;
   const ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
-  ctx.clearRect(0,0,w,h);
-  ctx.fillStyle = "#1e1e1e"; ctx.fillRect(0,0,w,h);
+
+  canvasState[canvasId] = { xVals, yVals, label, colorHex };
+
+  if (!canvas.dataset.hasListener) {
+    canvas.addEventListener("mousemove", (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (ev.clientX - rect.left) * (canvas.width / rect.width);
+      const mouseY = (ev.clientY - rect.top) * (canvas.height / rect.height);
+      const st = canvasState[canvasId];
+      if (st) renderCanvasContent(canvas, st.xVals, st.yVals, st.label, st.colorHex, mouseX, mouseY);
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      const st = canvasState[canvasId];
+      if (st) renderCanvasContent(canvas, st.xVals, st.yVals, st.label, st.colorHex, -1, -1);
+    });
+
+    canvas.dataset.hasListener = "true";
+  }
+
+  renderCanvasContent(canvas, xVals, yVals, label, colorHex, -1, -1);
+}
+
+function renderCanvasContent(canvas, xVals, yVals, label, colorHex, mouseX, mouseY) {
+  const ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Sfondo Sfumato Dark
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+  bgGrad.addColorStop(0, "#1e293b");
+  bgGrad.addColorStop(1, "#0f172a");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
 
   if (!xVals.length || !yVals.length) {
-    ctx.fillStyle = "#ffffff"; ctx.font = "12px Arial";
-    ctx.fillText("Nessun dato disponibile", 15, h / 2);
+    ctx.fillStyle = "#94a3b8"; ctx.font = "13px Inter, sans-serif";
+    ctx.fillText("Nessun dato ancora disponibile", 20, h / 2);
     return;
   }
 
-  const marginL = 45, marginR = 15, marginT = 20, marginB = 35;
+  const marginL = 52, marginR = 25, marginT = 32, marginB = 38;
   const cW = w - marginL - marginR, cH = h - marginT - marginB;
-
-  ctx.strokeStyle = "#d9d9d9"; ctx.lineWidth = 1;
-  ctx.strokeRect(marginL, marginT, cW, cH);
 
   const minX = Math.min(...xVals), maxX = Math.max(...xVals);
   let minY = Math.min(...yVals), maxY = Math.max(...yVals);
 
-  if (minX === maxX) { /* Singolo punto o vuoto */ }
-  if (minY === maxY) { minY -= 1; maxY += 1; }
-  const marginY = (maxY - minY) * 0.15;
+  if (minY === maxY) { minY -= 10; maxY += 10; }
+  const marginY = (maxY - minY) * 0.2;
   minY -= marginY; maxY += marginY;
 
   const mapX = x => marginL + ((x - (minX === maxX ? minX - 1 : minX)) / ((maxX === minX ? maxX + 1 : maxX) - (minX === maxX ? minX - 1 : minX))) * cW;
   const mapY = y => marginT + cH - ((y - minY) / (maxY - minY)) * cH;
 
-  // Griglia Y
-  ctx.strokeStyle = "#525252"; ctx.lineWidth = 0.6; ctx.fillStyle = "#ffffff"; ctx.font = "10px Arial";
+  // Griglia Orizzontale Tratteggiata
+  ctx.strokeStyle = "#334155"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.fillStyle = "#94a3b8"; ctx.font = "11px Inter, sans-serif";
   for (let i = 0; i <= 4; i++) {
     const valY = minY + (maxY - minY) * (i / 4);
     const posY = mapY(valY);
     ctx.beginPath(); ctx.moveTo(marginL, posY); ctx.lineTo(marginL + cW, posY); ctx.stroke();
-    ctx.fillText(valY.toFixed(1), 5, posY + 3);
+    ctx.fillText(valY.toFixed(1), 10, posY + 4);
   }
+  ctx.setLineDash([]);
 
-  // Asse X
-  xVals.forEach(x => {
-    const posX = mapX(x);
-    ctx.beginPath(); ctx.moveTo(posX, marginT); ctx.lineTo(posX, marginT + cH); ctx.stroke();
-    ctx.fillText(String(x), posX - 3, h - 10);
-  });
+  // Punti di Coordinata Calcolati
+  const points = xVals.map((x, i) => ({
+    x, y: yVals[i],
+    px: mapX(x), py: mapY(yVals[i])
+  }));
 
-  // Serie Dati
-  ctx.strokeStyle = colorHex; ctx.lineWidth = 2; ctx.beginPath();
-  xVals.forEach((x, i) => {
-    const px = mapX(x), py = mapY(yVals[i]);
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  // Sfumatura di riempimento sotto la linea
+  const areaGrad = ctx.createLinearGradient(0, marginT, 0, marginT + cH);
+  areaGrad.addColorStop(0, colorHex + "33");
+  areaGrad.addColorStop(1, colorHex + "00");
+  ctx.fillStyle = areaGrad;
+  ctx.beginPath();
+  ctx.moveTo(points[0].px, marginT + cH);
+  points.forEach(p => ctx.lineTo(p.px, p.py));
+  ctx.lineTo(points[points.length - 1].px, marginT + cH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Curva Principale con Effetto Glow
+  ctx.shadowColor = colorHex;
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.px, p.py); else ctx.lineTo(p.px, p.py);
   });
   ctx.stroke();
+  ctx.shadowBlur = 0;
 
-  // Punti
-  ctx.fillStyle = colorHex;
-  xVals.forEach((x, i) => {
-    const px = mapX(x), py = mapY(yVals[i]);
-    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  let activePoint = null;
+
+  // Render dei Punti e delle Etichette Permanenti (Valori Y & X)
+  points.forEach((p) => {
+    const dist = Math.hypot(mouseX - p.px, mouseY - p.py);
+    if (dist < 12) activePoint = p;
+
+    // Asse X (Turno)
+    ctx.fillStyle = "#cbd5e1"; ctx.font = "bold 11px Inter, sans-serif";
+    ctx.fillText(`T${p.x}`, p.px - 8, h - 12);
+
+    // Etichetta Valore Y sopra il punto
+    ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Inter, sans-serif";
+    const textY = p.y.toFixed(1);
+    const textW = ctx.measureText(textY).width;
+    ctx.fillText(textY, p.px - textW / 2, p.py - 12);
+
+    // Cerchio del Punto
+    ctx.beginPath();
+    ctx.arc(p.px, p.py, 5, 0, Math.PI * 2);
+    ctx.fillStyle = colorHex;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
   });
+
+  // Tooltip al Passaggio del Mouse (Hover Interattivo)
+  if (activePoint) {
+    ctx.beginPath();
+    ctx.arc(activePoint.px, activePoint.py, 8, 0, Math.PI * 2);
+    ctx.fillStyle = colorHex;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+
+    const tipText = `Turno ${activePoint.x}: ${activePoint.y}`;
+    ctx.font = "bold 12px Inter, sans-serif";
+    const tipW = ctx.measureText(tipText).width + 16;
+    let tipX = activePoint.px - tipW / 2;
+    let tipY = activePoint.py - 42;
+
+    if (tipX < 5) tipX = 5;
+    if (tipX + tipW > w - 5) tipX = w - tipW - 5;
+    if (tipY < 5) tipY = activePoint.py + 15;
+
+    ctx.fillStyle = "#0f172a";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.roundRect(tipX, tipY, tipW, 26, 6);
+    ctx.fill();
+    ctx.strokeStyle = colorHex;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(tipText, tipX + 8, tipY + 17);
+  }
 }
 
 // =================================================================
-// GUIDA (Identica a main_2.py)
+// GUIDA
 // =================================================================
 function aggiornaGuida() {
   const room = stato.room || {}, s = room.settings || {};
