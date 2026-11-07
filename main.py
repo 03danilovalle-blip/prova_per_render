@@ -1,6 +1,7 @@
 """
 Interfaccia web del Business Game.
-Questo file sostituisce la vecchia interfaccia Kivy di main.py.
+Questo file sostituisce l'interfaccia Kivy e integra la logica completa
+delle schermate Guida e Mercato di main_2.py.
 
 Avvio locale:
     python main.py
@@ -8,19 +9,11 @@ Avvio locale:
 Deploy su Render:
     Build Command: pip install -r requirements.txt
     Start Command: gunicorn main:app
-
-IMPORTANTE:
-- server.py contiene la logica del gioco e le API Flask.
-- main.py importa la stessa app Flask e aggiunge l'interfaccia HTML.
-- I due file devono trovarsi nella stessa cartella.
 """
 
 import os
 from flask import render_template_string
-
-# Riutilizza le API e la logica già presenti in server.py.
 from server import app
-
 
 PAGINA = r"""
 <!doctype html>
@@ -45,7 +38,8 @@ main{max-width:1200px;margin:22px auto;padding:0 16px 40px}
 .panel{max-width:760px;margin:24px auto}
 h2{margin:0 0 15px;font-size:21px}
 h3{margin:0 0 12px;font-size:16px}
-p{color:var(--muted);line-height:1.5}
+h4{margin:10px 0 6px;font-size:14px;color:var(--ink)}
+p{color:var(--muted);line-height:1.5;margin:0 0 10px}
 label{display:block;font-size:13px;font-weight:650;margin:10px 0 5px}
 input,select{width:100%;padding:10px 11px;border:1px solid #cfd6e2;border-radius:8px;background:white;color:var(--ink);font:inherit}
 input:focus,select:focus{outline:2px solid #b8caff;border-color:var(--primary)}
@@ -79,9 +73,11 @@ th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left}
 th{background:#f6f8fb}
 .table-wrap{overflow:auto}
 pre{white-space:pre-wrap;word-break:break-word;font:14px/1.55 inherit;margin:0}
-canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;background:white}
+canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;background:#1e1e1e}
 .hidden{display:none!important}
 .badge{display:inline-block;border-radius:20px;padding:5px 9px;background:#edf2ff;color:#2446a0;font-size:12px;font-weight:700}
+.guide-text{font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-wrap}
+.admin-bar-box{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;line-height:1.6}
 @media(max-width:760px){.grid,.grid3,.cards,.product-grid,.field-grid{grid-template-columns:1fr}header{padding:15px}main{margin-top:12px}.panel{margin:12px auto;padding:15px}}
 </style>
 </head>
@@ -178,6 +174,7 @@ canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;b
       <button data-tab="report" onclick="mostraTab('report')">Report</button>
       <button data-tab="guida" onclick="mostraTab('guida')">Guida</button>
     </nav>
+
     <div id="tab-home" class="view active">
       <div class="cards" id="company-metrics"></div>
       <div class="grid">
@@ -186,6 +183,7 @@ canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;b
       </div>
       <div class="section"><h3>Classifica</h3><div id="ranking"></div></div>
     </div>
+
     <div id="tab-leve" class="view">
       <div class="notice">Inserisci le decisioni del turno e premi “Conferma scelte”. Una volta confermate, le scelte non possono essere modificate.</div>
       <form id="decisions-form">
@@ -212,10 +210,40 @@ canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;b
       </form>
       <div id="game-message" class="message"></div>
     </div>
+
     <div id="tab-mercato" class="view">
-      <div class="section"><h3>Andamento dei mercati</h3><div class="grid"><div><h4>Mercato A</h4><canvas id="market-chart-a" width="600" height="230"></canvas></div><div><h4>Mercato B</h4><canvas id="market-chart-b" width="600" height="230"></canvas></div></div></div>
-      <div class="section"><h3>Ultimo risultato di mercato</h3><div id="market-results"></div></div>
+      <div class="section">
+        <h3 style="text-align:center;margin-bottom:6px">STIMA DOMANDA TURNO <span id="market-current-turn">1</span></h3>
+        <p style="text-align:center;font-size:16px;font-weight:bold;color:var(--primary)" id="market-estimate-label">Mercato A: - | Mercato B: -</p>
+      </div>
+
+      <div class="section">
+        <h3>Andamento della Domanda di Mercato</h3>
+        <div class="grid">
+          <div><h4>Domanda mercato A</h4><canvas id="chart-demand-a" width="550" height="230"></canvas></div>
+          <div><h4>Domanda mercato B</h4><canvas id="chart-demand-b" width="550" height="230"></canvas></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Medie di Mercato - Prodotto A</h3>
+        <div class="grid3">
+          <div><h4>Prezzo medio A</h4><canvas id="chart-price-a" width="360" height="200"></canvas></div>
+          <div><h4>Visibilità media A</h4><canvas id="chart-visibility-a" width="360" height="200"></canvas></div>
+          <div><h4>Ricerca media A</h4><canvas id="chart-research-a" width="360" height="200"></canvas></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Medie di Mercato - Prodotto B</h3>
+        <div class="grid3">
+          <div><h4>Prezzo medio B</h4><canvas id="chart-price-b" width="360" height="200"></canvas></div>
+          <div><h4>Visibilità media B</h4><canvas id="chart-visibility-b" width="360" height="200"></canvas></div>
+          <div><h4>Ricerca media B</h4><canvas id="chart-research-b" width="360" height="200"></canvas></div>
+        </div>
+      </div>
     </div>
+
     <div id="tab-report" class="view">
       <div class="section"><h3>Seleziona situazione</h3><select id="report-turn" onchange="aggiornaReport()"><option value="current">Situazione attuale</option></select></div>
       <div class="grid">
@@ -226,23 +254,200 @@ canvas{width:100%;height:230px;border:1px solid var(--line);border-radius:10px;b
       <div class="section"><h3>Flussi di cassa</h3><div id="report-cashflow"></div></div>
       <div class="section"><h3>Indici</h3><div id="report-ratios"></div></div>
     </div>
+
     <div id="tab-guida" class="view">
-      <div class="section"><h3>Come funziona il gioco</h3>
-        <p><b>Marketing:</b> prezzo e promozione influenzano la competitività e la visibilità dei prodotti.</p>
-        <p><b>Produzione:</b> scegli la quantità da produrre e gli investimenti per aumentare la capacità.</p>
-        <p><b>Finanza:</b> puoi richiedere un finanziamento per sostenere le attività aziendali.</p>
-        <p><b>Approvvigionamento:</b> acquista materie prime necessarie alla produzione.</p>
-        <p><b>Risorse umane:</b> assumi o licenzia personale e definisci gli straordinari.</p>
-        <p><b>Ricerca e sviluppo:</b> investi in ricerca interna o co-progettazione per migliorare i prodotti.</p>
-        <p>Le scelte vengono elaborate dal server quando tutti i giocatori della stanza hanno confermato il turno.</p>
+      <div class="admin-bar-box">
+        <div id="guide-admin-row1"><b>Mercato A:</b> Prezzo: -% | Visibilità: -% | Ricerca: -% &nbsp;&nbsp; <b>Mercato B:</b> Prezzo: -% | Visibilità: -% | Ricerca: -%</div>
+        <div id="guide-admin-row2"><b>Interessi:</b> -% &nbsp;|&nbsp; <b>Costo acquisto:</b> - &nbsp;|&nbsp; <b>Rapporto inv./capacità:</b> -</div>
+        <div id="guide-admin-row3"><b>Rapporti A:</b> Visibilità: - | Ricerca interna: - | Co-progettazione: - &nbsp;&nbsp; <b>Rapporti B:</b> Visibilità: - | Ricerca interna: - | Co-progettazione: -</div>
+      </div>
+
+      <div class="section">
+        <h3>Guida Completa al Business Game</h3>
+        <div class="guide-text">SPIEGAZIONE DEI PARAMETRI ADMIN
+
+PERCENTUALI DI MERCATO
+Le percentuali di mercato indicano quanto incidono prezzo, visibilità e ricerca nella competizione tra aziende.
+
+Prezzo:
+Indica quanto il prezzo pesa nella scelta del mercato. Nel calcolo del mercato un prezzo più alto riduce la competitività del prodotto.
+
+Visibilità:
+Indica quanto la promozione influenza la capacità dell'azienda di vendere. Più il prodotto è visibile, più aumenta la sua forza competitiva.
+
+Ricerca:
+Indica quanto l'investimento in ricerca influenza la qualità competitiva del prodotto sul mercato.
+
+INTERESSI
+Il valore degli interessi indica il costo del finanziamento richiesto. Quando un'azienda chiede un finanziamento, nei turni successivi pagherà una quota del debito e gli interessi calcolati su quel finanziamento.
+
+COSTO DI ACQUISTO
+Il costo di acquisto rappresenta il costo unitario delle materie prime. Viene usato per calcolare il valore del magazzino materie prime, il costo degli acquisti e parte del valore dei prodotti finiti.
+
+RAPPORTO INVESTIMENTO/CAPACITÀ
+Questo rapporto indica quanto investimento serve per aumentare la capacità produttiva dell'azienda. Più il rapporto è alto, più è costoso aumentare la capacità.
+
+RAPPORTO INVESTIMENTO/VISIBILITÀ
+Questo rapporto indica quanto investimento in promozione serve per aumentare la visibilità del prodotto. È separato per Prodotto A e Prodotto B.
+
+RAPPORTO RICERCA INTERNA
+Indica quanto investimento in ricerca interna serve per aumentare il livello di ricerca del prodotto. Anche questo parametro è distinto tra Prodotto A e Prodotto B.
+
+RAPPORTO CO-PROGETTAZIONE
+Indica quanto investimento in co-progettazione serve per aumentare il livello di ricerca del prodotto. Può essere diverso dalla ricerca interna e permette di simulare una modalità alternativa di innovazione.
+
+
+LEVE DI MARKETING
+
+Le leve di marketing determinano la competitività commerciale dei prodotti.
+
+Prezzo:
+Il prezzo rappresenta il valore di vendita del prodotto. Un prezzo alto aumenta il ricavo unitario, ma può ridurre la competitività del prodotto sul mercato. Un prezzo basso può aiutare a vendere di più, ma riduce il margine su ogni unità venduta.
+
+Promozione:
+La promozione rappresenta l'investimento usato per aumentare la visibilità del prodotto. Maggiore è la promozione, maggiore sarà l'aumento della visibilità, secondo il rapporto investimento/visibilità impostato dall'admin. La promozione aumenta gli investimenti nello Stato Patrimoniale e viene ammortizzata nei turni successivi.
+
+
+LEVE DI PRODUZIONE
+
+Le leve di produzione permettono di decidere quante unità produrre e quanto aumentare la capacità produttiva dell'azienda.
+
+Investimento capacità:
+Serve ad aumentare la capacità produttiva. L'aumento ottenuto dipende dal rapporto investimento/capacità impostato dall'admin. Anche questo valore aumenta gli investimenti nello Stato Patrimoniale e viene ammortizzato nei turni successivi.
+
+Quantità prodotto A:
+Indica quante unità del Prodotto A vengono prodotte nel turno corrente. Questa quantità aumenta il magazzino prodotti disponibili prima del calcolo del mercato.
+
+Quantità prodotto B:
+Indica quante unità del Prodotto B vengono prodotte nel turno corrente. Come per il prodotto A, questa quantità aumenta il magazzino prodotti disponibili prima del calcolo del mercato.
+
+La produzione consuma materie prime e deve rispettare i vincoli di capacità produttiva e ore di lavoro disponibili. Se produci troppo poco, potresti non riuscire a soddisfare la domanda; se produci troppo, aumenterà il magazzino prodotti finiti.
+
+
+LEVE DI FINANZA
+
+Le leve di finanza consentono all'azienda di reperire le risorse economiche necessarie per sostenere gli investimenti e la gestione aziendale.
+
+Richiesta di finanziamento:
+Permette di richiedere un prestito bancario. L'importo richiesto viene immediatamente aggiunto alla liquidità (cassa) dell'azienda e aumenta i debiti verso banche nello Stato Patrimoniale.
+
+A partire dai turni successivi il finanziamento viene rimborsato gradualmente secondo il piano di ammortamento del gioco. Ad ogni rimborso vengono pagati sia una quota del capitale ricevuto sia gli interessi calcolati utilizzando il tasso impostato dall'amministratore. I pagamenti riducono la liquidità dell'azienda e vengono registrati nei Flussi di Cassa e nel Conto Economico.
+
+Una richiesta di finanziamento elevata aumenta le risorse disponibili nel breve periodo, ma comporta maggiori costi finanziari nei turni successivi.
+
+
+LEVE DI APPROVVIGIONAMENTO
+
+Le leve di approvvigionamento permettono di decidere come acquistare le materie prime necessarie alla produzione.
+
+Quantità:
+Rappresenta il numero di materie prime acquistate presso ciascun fornitore. La somma delle quantità acquistate determina il totale delle materie prime che entreranno nel magazzino dell'azienda.
+
+Le materie prime acquistate aumentano il valore del Magazzino Materie Prime nello Stato Patrimoniale e saranno utilizzate per la produzione dei prodotti A e B nei turni successivi. Un acquisto insufficiente può limitare la produzione, mentre un acquisto eccessivo aumenta il capitale immobilizzato nel magazzino.
+
+
+LEVE DI RISORSE UMANE
+
+Le leve di Risorse Umane consentono di gestire il personale e l'organizzazione del lavoro dell'azienda. Una corretta gestione delle risorse umane permette di sfruttare al meglio la capacità produttiva e di adattare l'azienda alle esigenze del mercato.
+
+Personale:
+Attraverso i pulsanti 'Assumi' e 'Licenzia' è possibile aumentare o ridurre il numero di dipendenti dell'azienda. Un numero maggiore di dipendenti può consentire una migliore organizzazione della produzione, ma comporta un aumento del costo del personale che verrà registrato nel Conto Economico e nei Flussi di Cassa.
+
+Straordinari:
+Consentono di aumentare le ore a disposizione senza assumere personale, ma ad un costo orario maggiore.
+
+
+LEVE DI RICERCA E SVILUPPO
+
+Le leve di Ricerca e Sviluppo consentono di migliorare il livello di innovazione dei prodotti A e B, aumentando la loro competitività sul mercato.
+
+Modalità di ricerca:
+Per ciascun prodotto è possibile scegliere tra Ricerca Interna e Co-progettazione. Le due modalità utilizzano rapporti di conversione diversi definiti dall'amministratore del gioco.
+
+Ricerca Interna:
+L'azienda sviluppa autonomamente il prodotto. L'efficacia dell'investimento dipende dal rapporto 'Ricerca interna' impostato dall'amministratore. Il valore del rapporto verrà poi aggiunto a ricerca del prodotto al turno t+2 dove t è il turno attuale.
+
+Co-progettazione:
+L'azienda sviluppa il prodotto insieme a partner esterni. Anche in questo caso l'incremento del livello di ricerca dipende dal rapporto 'Co-progettazione' definito dall'amministratore.
+
+Investimento in ricerca:
+L'importo inserito rappresenta l'investimento destinato allo sviluppo del prodotto. Maggiore è l'investimento, maggiore sarà l'aumento del livello di ricerca del prodotto in funzione del rapporto scelto.
+
+Gli investimenti in Ricerca e Sviluppo vengono registrati nello Stato Patrimoniale come investimenti pluriennali e vengono ammortizzati nei turni successivi. Un livello di ricerca più elevato aumenta la competitività del prodotto quando il mercato attribuisce importanza alla variabile Ricerca.
+
+
+COME USARE QUESTI PARAMETRI
+Il giocatore dovrebbe leggere questi valori prima di compilare le leve. Se, ad esempio, la visibilità pesa molto nel mercato e il rapporto investimento/visibilità è basso, investire in promozione può essere una scelta conveniente. Se invece il prezzo pesa molto, sarà importante controllare attentamente il prezzo di vendita.
+
+
+STATO PATRIMONIALE
+
+Lo Stato Patrimoniale rappresenta la situazione economica e finanziaria dell'azienda alla fine di ogni turno. È suddiviso in Attivo e Passivo e mostra come sono impiegate le risorse dell'azienda e come sono state finanziate.
+
+ATTIVO FISSO
+Investimenti: Questa voce rappresenta il valore degli investimenti pluriennali ancora non ammortizzati. Comprende gli investimenti effettuati in promozione, capacità produttiva e ricerca e sviluppo. Ad ogni turno una quota degli investimenti viene trasferita negli investimenti correnti e registrata come ammortamento nel Conto Economico.
+
+ATTIVO CORRENTE
+Cassa: La cassa rappresenta la liquidità disponibile dell'azienda. Aumenta grazie agli incassi delle vendite e ai finanziamenti ottenuti, mentre diminuisce per effetto degli acquisti, degli investimenti, del pagamento dei debiti, degli interessi e di tutte le altre uscite monetarie.
+Magazzino materie prime: Rappresenta il valore economico delle materie prime disponibili. Aumenta con gli acquisti effettuati dai fornitori e diminuisce quando le materie prime vengono utilizzate nella produzione dei prodotti.
+Magazzino prodotti finiti: Indica il valore economico dei prodotti già realizzati ma non ancora venduti. Aumenta quando la produzione supera le vendite e diminuisce quando i prodotti vengono acquistati dal mercato.
+Investimenti correnti: Contengono la quota degli investimenti pluriennali che sta per essere ammortizzata.
+
+TOTALE ATTIVO: Il totale dell'attivo è dato dalla somma di tutte le attività presenti nello Stato Patrimoniale.
+
+PASSIVO E PATRIMONIO NETTO
+Capitale sociale: Rappresenta il patrimonio netto dell'azienda. Nel turno iniziale è pari al capitale iniziale deciso dall'amministratore più il valore iniziale del magazzino materie prime.
+Debiti verso banche: Rappresentano la parte a medio-lungo termine dei finanziamenti ottenuti.
+Debiti correnti: Rappresentano la quota di finanziamenti che dovrà essere rimborsata nel breve periodo.
+
+
+CONTO ECONOMICO
+
+Il Conto Economico rappresenta il risultato della gestione aziendale durante un turno di gioco.
+VALORE DELLA PRODUZIONE: Ricavi di vendita e Variazione prodotti finiti.
+COSTI ESTERNI: Acquisto materie prime e Variazione materie prime.
+VALORE AGGIUNTO: Ricchezza generata dall'attività aziendale dopo i costi esterni.
+COSTO DEL PERSONALE: Costo sostenuto per i dipendenti e straordinari.
+MARGINE OPERATIVO LORDO (MOL / EBITDA): Risultato della gestione operativa prima degli ammortamenti.
+MARGINE OPERATIVO NETTO (MON / EBIT): MOL meno ammortamenti.
+UTILE D'ESERCIZIO: MON meno interessi passivi.
+
+
+FLUSSO DI CASSA
+
+Il Flusso di Cassa mostra esclusivamente le entrate e le uscite monetarie che modificano la liquidità disponibile dell'impresa.
+GESTIONE OPERATIVA: Entrate da clienti meno uscite per fornitori, personale ed interessi.
+ATTIVITÀ DI INVESTIMENTO: Uscite per promozione, capacità produttiva e ricerca.
+ATTIVITÀ DI FINANZIAMENTO: Acquisizione nuovi debiti meno pagamento quote capitale debiti esistenti.
+CASSA FINALE: Liquidità totale disponibile al termine del turno.
+
+
+INDICI ECONOMICO-FINANZIARI
+
+ROE (Return On Equity): Utile / Capitale Sociale. Misura la redditività del capitale investito dai soci.
+ROI (Return On Investment): Margine Operativo Netto / Totale Attivo. Misura l'efficienza degli investimenti.
+ROD (Costo dell'indebitamento): Interessi / Debiti Totali.
+Indice Q: Debiti Totali / Capitale Sociale. Grado di indebitamento.
+Indice S: Utile / Margine Operativo Netto. Incidenza della gestione finanziaria.
+Leva Finanziaria: ROI - ROD.
+
+
+CLASSIFICA DEI GIOCATORI
+
+La classifica viene aggiornata al termine di ogni turno in base al punteggio:
+Punteggio = 0.7 × Quota di Mercato + 0.3 × ROE
+
+Quota di Mercato = ((Venduto A / Domanda A) + (Venduto B / Domanda B)) / 2</div>
       </div>
     </div>
   </section>
 </main>
+
 <script>
 const API = "";
 let stato = {room_code:"", company_name:"", admin_password:"", player:null, room:null, personnel:0};
 const $ = id => document.getElementById(id);
+
 async function api(url, method="GET", body=null) {
   const opt={method,headers:{"Content-Type":"application/json"}};
   if(body!==null) opt.body=JSON.stringify(body);
@@ -251,11 +456,13 @@ async function api(url, method="GET", body=null) {
   if(!res.ok || data.success===false) throw new Error(data.message || `Errore HTTP ${res.status}`);
   return data;
 }
+
 function msg(id,text,error=false){const el=$(id);el.textContent=text;el.className="message "+(error?"error":"success");}
 function show(id){["access-view","admin-view","game-view"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden");}
 function salvaSessione(){sessionStorage.setItem("business-game-session",JSON.stringify(stato));}
 function caricaSessione(){try{const x=JSON.parse(sessionStorage.getItem("business-game-session")||"null");if(x)stato=x;}catch(e){}}
 function tornaAccesso(){sessionStorage.removeItem("business-game-session");stato={room_code:"",company_name:"",admin_password:"",player:null,room:null,personnel:0};show("access-view");$("header-user").textContent="";}
+
 async function creaStanza(){
   try{
     const password=$("admin-password").value.trim(); if(!password) throw new Error("Inserisci la password admin.");
@@ -266,7 +473,9 @@ async function creaStanza(){
     msg("admin-message","Stanza creata. Imposta e salva i parametri.");
   }catch(e){msg("access-message",e.message,true);}
 }
+
 function formObject(form){return Object.fromEntries(new FormData(form).entries());}
+
 async function salvaImpostazioni(ev){
   ev.preventDefault();
   try{
@@ -288,6 +497,7 @@ async function salvaImpostazioni(ev){
     msg("admin-message",d.message); await aggiornaAdmin();
   }catch(e){msg("admin-message",e.message,true);}
 }
+
 async function aggiornaAdmin(){
   try{
     const d=await api("/room/"+encodeURIComponent(stato.room_code));
@@ -296,6 +506,7 @@ async function aggiornaAdmin(){
     $("players-list").innerHTML=players.length?players.map(p=>`<div class="metric"><b>${esc(p.company_name)}</b><div class="muted">Turno ${p.current_turn} · ${p.choices_confirmed?"Scelte confermate":"In attesa"}</div></div>`).join(""):"Nessun giocatore è ancora entrato.";
   }catch(e){msg("admin-message",e.message,true);}
 }
+
 async function entraStanza(){
   try{
     const company_name=$("join-company").value.trim(),room_code=$("join-code").value.trim().toUpperCase();
@@ -308,6 +519,7 @@ async function entraStanza(){
     mostraTab("home");renderGioco();
   }catch(e){msg("access-message",e.message,true);}
 }
+
 async function aggiornaStato(){
   const d=await api("/room/"+encodeURIComponent(stato.room_code));
   stato.room=d.room;
@@ -316,10 +528,12 @@ async function aggiornaStato(){
   if(stato.player)stato.personnel=Number(stato.player.company?.personnel||stato.personnel||0);
   salvaSessione();
 }
+
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function fmt(v){const x=Number(v||0);return Number.isFinite(x)?x.toLocaleString("it-IT",{maximumFractionDigits:2}):"0";}
 function metric(label,value){return `<div class="metric"><span class="muted">${esc(label)}</span><b>${esc(fmt(value))}</b></div>`;}
 function renderProdotto(p,sale){return `<p>Prezzo: <b>${fmt(p.price)}</b></p><p>Visibilità: ${fmt(p.visibility)}</p><p>Ricerca: ${fmt(p.research)}</p><p>Quantità in magazzino: ${fmt(p.quantity)}</p><p>Produzione oraria: ${fmt(p.production_per_hour)}</p><p>Venduto nell'ultimo turno: ${fmt(sale)}</p>`;}
+
 function renderGioco(){
   const p=stato.player||{},c=p.company||{},pr=p.products||{},sales=p.sales||{A:0,B:0};
   $("game-turn").textContent=`${p.current_turn||1}/${(stato.room?.max_turns||8)}`;
@@ -331,9 +545,11 @@ function renderGioco(){
   const disabled=p.choices_confirmed||p.game_finished||(p.current_turn||1)>(stato.room?.max_turns||8);
   $("submit-decisions").disabled=disabled;
   $("decisions-form").querySelectorAll("input,select,button").forEach(el=>{if(el.type!=="button")el.disabled=disabled;});
-  aggiornaMercato();aggiornaReport();
+  aggiornaMercato();aggiornaReport();aggiornaGuida();
 }
+
 function modificaPersonale(delta){stato.personnel=Math.max(0,Number(stato.personnel||0)+delta);$("personnel-value").textContent=stato.personnel;}
+
 async function inviaDecisioni(ev){
   ev.preventDefault();
   try{
@@ -353,16 +569,21 @@ async function inviaDecisioni(ev){
     await aggiornaStato();renderGioco();mostraTab("home");
   }catch(e){msg("game-message",e.message,true);}
 }
+
 function mostraTab(tab){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
   document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
   $("tab-"+tab).classList.add("active");
-  if(tab==="report")aggiornaReport();if(tab==="mercato")aggiornaMercato();
+  if(tab==="report")aggiornaReport();
+  if(tab==="mercato")aggiornaMercato();
+  if(tab==="guida")aggiornaGuida();
 }
+
 function tabella(obj,labels){
   const rows=Object.entries(labels).map(([k,l])=>`<tr><td>${esc(l)}</td><td>${fmt(obj?.[k])}</td></tr>`).join("");
   return `<div class="table-wrap"><table>${rows}</table></div>`;
 }
+
 function aggiornaReport(){
   const p=stato.player||{},history=p.history||{},sel=$("report-turn").value||"current";
   let company=p.company||{},turn=p.current_turn||1;
@@ -384,26 +605,142 @@ function aggiornaReport(){
   const rod=Number(inc.interest||0)/(debt||Infinity);
   $("report-ratios").innerHTML=tabella({roe,roi,rod,q:debt/(Number(bs.share_capital||0)||Infinity),s:Number(inc.profit||0)/(Number(inc.operating_income||0)||Infinity),leverage:roi-rod},{roe:"ROE",roi:"ROI",rod:"Costo indebitamento (ROD)",q:"Q",s:"S",leverage:"Leva"});
 }
-function aggiornaMercato(){
-  const room=stato.room||{},settings=room.settings||{},history=room.market_results_by_turn||{};
-  disegnaGrafico("market-chart-a",settings.market_values_a||[],"Mercato A");
-  disegnaGrafico("market-chart-b",settings.market_values_b||[],"Mercato B");
-  const keys=Object.keys(history).sort((a,b)=>Number(b)-Number(a));
-  const last=keys.length?history[keys[0]]:room.market_results||{};
-  $("market-results").innerHTML=last&&Object.keys(last).length?`<pre>${esc(JSON.stringify(last,null,2))}</pre>`:"I risultati saranno disponibili dopo la conferma di tutti i giocatori.";
+
+// =================================================================
+// MERCATO (Identico a main_2.py)
+// =================================================================
+function stimaLineare(ini, fin, turno, maxTurns) {
+  ini = Number(ini||0); fin = Number(fin||0);
+  if (maxTurns <= 1) return Math.round(ini);
+  const inc = (fin - ini) / (maxTurns - 1);
+  return Math.round(ini + inc * (turno - 1));
 }
-function disegnaGrafico(id,values,title){
-  const canvas=$(id),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);
-  ctx.fillStyle="#667085";ctx.font="14px Arial";ctx.fillText(title,14,20);
-  if(!values.length){ctx.fillText("Dati non ancora disponibili",14,55);return;}
-  const nums=values.map(Number),min=Math.min(...nums),max=Math.max(...nums),range=(max-min)||1;
-  ctx.strokeStyle="#d9dfeb";ctx.lineWidth=1;
-  for(let i=0;i<5;i++){let y=38+i*(h-70)/4;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-15,y);ctx.stroke();}
-  ctx.strokeStyle="#2457d6";ctx.lineWidth=3;ctx.beginPath();
-  nums.forEach((v,i)=>{const x=45+i*(w-65)/Math.max(1,nums.length-1),y=h-32-(v-min)/range*(h-85);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
-  ctx.stroke();ctx.fillStyle="#172033";ctx.font="12px Arial";
-  nums.forEach((v,i)=>{const x=45+i*(w-65)/Math.max(1,nums.length-1),y=h-32-(v-min)/range*(h-85);ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();ctx.fillText(String(i+1),x-3,h-12);});
+
+function calcolaMedia(arr) {
+  if (!arr || !arr.length) return 0;
+  const valid = arr.map(Number).filter(x => !isNaN(x));
+  if (!valid.length) return 0;
+  return Math.round((valid.reduce((a,b)=>a+b,0)/valid.length)*100)/100;
 }
+
+function aggiornaMercato() {
+  const room = stato.room || {}, settings = room.settings || {}, players = room.players || [];
+  const currentTurn = stato.player?.current_turn || 1;
+  const maxTurns = room.max_turns || 8;
+
+  $("market-current-turn").textContent = currentTurn;
+  const stimaA = stimaLineare(settings.market_initial_a, settings.market_final_a, currentTurn, maxTurns);
+  const stimaB = stimaLineare(settings.market_initial_b, settings.market_final_b, currentTurn, maxTurns);
+  $("market-estimate-label").textContent = `Mercato A: ${stimaA} | Mercato B: ${stimaB}`;
+
+  const pastTurns = Array.from({length: Math.max(0, currentTurn - 1)}, (_, i) => i + 1);
+  const marketValA = settings.market_values_a || [];
+  const marketValB = settings.market_values_b || [];
+
+  const demandA = pastTurns.map(t => Number(marketValA[t-1] || 0));
+  const demandB = pastTurns.map(t => Number(marketValB[t-1] || 0));
+
+  disegnaGraficoAvanzato("chart-demand-a", pastTurns, demandA, "Domanda A", "#1a66ff");
+  disegnaGraficoAvanzato("chart-demand-b", pastTurns, demandB, "Domanda B", "#1a66ff");
+
+  const avgPriceA = [], avgVisA = [], avgResA = [];
+  const avgPriceB = [], avgVisB = [], avgResB = [];
+
+  pastTurns.forEach(t => {
+    const pA = [], vA = [], rA = [];
+    const pB = [], vB = [], rB = [];
+    players.forEach(p => {
+      const turnData = p.history?.[String(t)]?.prodotti || {};
+      if (turnData.A) { pA.push(turnData.A.price); vA.push(turnData.A.visibility); rA.push(turnData.A.research); }
+      if (turnData.B) { pB.push(turnData.B.price); vB.push(turnData.B.visibility); rB.push(turnData.B.research); }
+    });
+    avgPriceA.push(calcolaMedia(pA)); avgVisA.push(calcolaMedia(vA)); avgResA.push(calcolaMedia(rA));
+    avgPriceB.push(calcolaMedia(pB)); avgVisB.push(calcolaMedia(vB)); avgResB.push(calcolaMedia(rB));
+  });
+
+  disegnaGraficoAvanzato("chart-price-a", pastTurns, avgPriceA, "Prezzo medio A", "#ff4040");
+  disegnaGraficoAvanzato("chart-visibility-a", pastTurns, avgVisA, "Visibilità media A", "#00b33c");
+  disegnaGraficoAvanzato("chart-research-a", pastTurns, avgResA, "Ricerca media A", "#1a66ff");
+
+  disegnaGraficoAvanzato("chart-price-b", pastTurns, avgPriceB, "Prezzo medio B", "#ff4040");
+  disegnaGraficoAvanzato("chart-visibility-b", pastTurns, avgVisB, "Visibilità media B", "#00b33c");
+  disegnaGraficoAvanzato("chart-research-b", pastTurns, avgResB, "Ricerca media B", "#1a66ff");
+}
+
+function disegnaGraficoAvanzato(canvasId, xVals, yVals, label, colorHex) {
+  const canvas = $(canvasId); if (!canvas) return;
+  const ctx = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#1e1e1e"; ctx.fillRect(0,0,w,h);
+
+  if (!xVals.length || !yVals.length) {
+    ctx.fillStyle = "#ffffff"; ctx.font = "12px Arial";
+    ctx.fillText("Nessun dato disponibile", 15, h / 2);
+    return;
+  }
+
+  const marginL = 45, marginR = 15, marginT = 20, marginB = 35;
+  const cW = w - marginL - marginR, cH = h - marginT - marginB;
+
+  ctx.strokeStyle = "#d9d9d9"; ctx.lineWidth = 1;
+  ctx.strokeRect(marginL, marginT, cW, cH);
+
+  const minX = Math.min(...xVals), maxX = Math.max(...xVals);
+  let minY = Math.min(...yVals), maxY = Math.max(...yVals);
+
+  if (minX === maxX) { /* Singolo punto o vuoto */ }
+  if (minY === maxY) { minY -= 1; maxY += 1; }
+  const marginY = (maxY - minY) * 0.15;
+  minY -= marginY; maxY += marginY;
+
+  const mapX = x => marginL + ((x - (minX === maxX ? minX - 1 : minX)) / ((maxX === minX ? maxX + 1 : maxX) - (minX === maxX ? minX - 1 : minX))) * cW;
+  const mapY = y => marginT + cH - ((y - minY) / (maxY - minY)) * cH;
+
+  // Griglia Y
+  ctx.strokeStyle = "#525252"; ctx.lineWidth = 0.6; ctx.fillStyle = "#ffffff"; ctx.font = "10px Arial";
+  for (let i = 0; i <= 4; i++) {
+    const valY = minY + (maxY - minY) * (i / 4);
+    const posY = mapY(valY);
+    ctx.beginPath(); ctx.moveTo(marginL, posY); ctx.lineTo(marginL + cW, posY); ctx.stroke();
+    ctx.fillText(valY.toFixed(1), 5, posY + 3);
+  }
+
+  // Asse X
+  xVals.forEach(x => {
+    const posX = mapX(x);
+    ctx.beginPath(); ctx.moveTo(posX, marginT); ctx.lineTo(posX, marginT + cH); ctx.stroke();
+    ctx.fillText(String(x), posX - 3, h - 10);
+  });
+
+  // Serie Dati
+  ctx.strokeStyle = colorHex; ctx.lineWidth = 2; ctx.beginPath();
+  xVals.forEach((x, i) => {
+    const px = mapX(x), py = mapY(yVals[i]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // Punti
+  ctx.fillStyle = colorHex;
+  xVals.forEach((x, i) => {
+    const px = mapX(x), py = mapY(yVals[i]);
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+// =================================================================
+// GUIDA (Identica a main_2.py)
+// =================================================================
+function aggiornaGuida() {
+  const room = stato.room || {}, s = room.settings || {};
+  const pa = s.market_variable_percentages_a || [0,0,0];
+  const pb = s.market_variable_percentages_b || [0,0,0];
+
+  $("guide-admin-row1").innerHTML = `<b>MERCATO A</b> Prezzo: ${pa[0]||0}% | Visibilità: ${pa[1]||0}% | Ricerca: ${pa[2]||0}% &nbsp;&nbsp;&nbsp;&nbsp; <b>MERCATO B</b> Prezzo: ${pb[0]||0}% | Visibilità: ${pb[1]||0}% | Ricerca: ${pb[2]||0}%`;
+  $("guide-admin-row2").innerHTML = `<b>Interessi:</b> ${s.interests||0}% &nbsp;|&nbsp; <b>Costo acquisto:</b> ${s.purchase_cost||0} &nbsp;|&nbsp; <b>Rapporto inv./capacità:</b> ${s.investment_capacity_ratio||0}`;
+  $("guide-admin-row3").innerHTML = `<b>RAPPORTI A</b> Visibilità: ${s.investment_visibility_ratio_a||0} | Ricerca interna: ${s.innovation_internal_research_ratio_a||0} | Co-progettazione: ${s.innovation_coproj_research_ratio_a||0} &nbsp;&nbsp;&nbsp;&nbsp; <b>RAPPORTI B</b> Visibilità: ${s.investment_visibility_ratio_b||0} | Ricerca interna: ${s.innovation_internal_research_ratio_b||0} | Co-progettazione: ${s.innovation_coproj_research_ratio_b||0}`;
+}
+
 async function ripristina(){
   caricaSessione();
   if(stato.room_code&&stato.admin_password&&!stato.company_name){
@@ -413,6 +750,7 @@ async function ripristina(){
     catch(e){tornaAccesso();msg("access-message","Sessione non più disponibile: "+e.message,true);}
   }else show("access-view");
 }
+
 $("settings-form").addEventListener("submit",salvaImpostazioni);
 $("decisions-form").addEventListener("submit",inviaDecisioni);
 setInterval(()=>{if(!document.getElementById("admin-view").classList.contains("hidden"))aggiornaAdmin();},5000);
@@ -423,11 +761,9 @@ ripristina();
 </html>
 """
 
-
 @app.get("/")
 def pagina_principale():
     return render_template_string(PAGINA)
-
 
 if __name__ == "__main__":
     app.run(
