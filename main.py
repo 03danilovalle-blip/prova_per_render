@@ -2,7 +2,7 @@
 Interfaccia web del Business Game.
 Questo file integra:
 1. Validazione preventiva degli errori delle leve nel frontend (main.py) prima dell'invio al server.
-2. Pop-up di conferma prima di uscire dalla partita (sia tramite pulsante che chiusura scheda).
+2. Pop-up di conferma prima di uscire dalla partita (pulsante Esci, chiusura scheda e tasto Indietro su smartphone).
 
 Avvio locale:
     python main.py
@@ -66,7 +66,7 @@ nav button.active{background:var(--primary);color:white}
 .product-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .product{background:#f8faff;border:1px solid var(--line);padding:13px;border-radius:10px}
 .product h4{margin:0 0 8px;border-bottom:none;padding-bottom:0}
-.notice{padding:11px 13px;border-radius:9px;background:var(--soft);color:#25417f;margin:12px 0}
+.notice{padding:11px 13px;border-radius:99px;background:var(--soft);color:#25417f;margin:12px 0}
 .message{margin-top:12px;font-weight:600}
 .message.error{color:var(--bad)}.message.success{color:var(--good)}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -657,20 +657,45 @@ async function api(url, method="GET", body=null) {
 }
 
 function msg(id,text,error=false){const el=$(id);el.textContent=text;el.className="message "+(error?"error":"success");}
-function show(id){["access-view","admin-view","game-view"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden");}
+
+// MODIFICA MOSTRAMONTO VISTE CON AGGIUNTA STATO CRONOLOGIA MOBILE
+function show(id){
+  ["access-view","admin-view","game-view"].forEach(x=>$(x).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  
+  if (id === "admin-view" || id === "game-view") {
+    // Inserisce uno stato fittizio nella cronologia del browser
+    history.pushState({ inGame: true }, "");
+  }
+}
+
 function salvaSessione(){sessionStorage.setItem("business-game-session",JSON.stringify(stato));}
 function caricaSessione(){try{const x=JSON.parse(sessionStorage.getItem("business-game-session")||"null");if(x)stato=x;}catch(e){}}
 
-// FUNZIONE PER L'USCITA CON CONFERMA TRAMITE POP-UP
-function tornaAccesso(){
-  const conferma = confirm("Sei sicuro di voler uscire dalla partita?");
-  if (!conferma) return;
+// FUNZIONE PER L'USCITA CON CONFERMA TRAMITE POP-UP (PULSANTE ESCI E tasto INDIETRO MOBILE)
+function tornaAccesso(force = false){
+  if (!force) {
+    const conferma = confirm("Sei sicuro di voler uscire dalla partita?");
+    if (!conferma) {
+      // Se l'utente annulla l'uscita da smartphone, ripristiniamo lo stato della cronologia
+      history.pushState({ inGame: true }, "");
+      return false;
+    }
+  }
 
   sessionStorage.removeItem("business-game-session");
   stato = {room_code:"", company_name:"", admin_password:"", player:null, room:null, personnel:0};
   show("access-view");
   $("header-user").textContent = "";
+  return true;
 }
+
+// GESTIONE PULSANTE INDIETRO (GESTURE / FISICO) SU SMARTPHONE
+window.addEventListener("popstate", function (e) {
+  if (stato.room_code) {
+    tornaAccesso();
+  }
+});
 
 async function creaStanza(){
   try{
@@ -1228,7 +1253,7 @@ async function ripristina(){
     $("admin-room-code").textContent=stato.room_code;$("share-code").textContent=stato.room_code;show("admin-view");$("header-user").textContent="Amministratore · "+stato.room_code;await aggiornaAdmin();
   }else if(stato.room_code&&stato.company_name){
     try{await aggiornaStato();show("game-view");$("game-title").textContent=stato.company_name;$("game-room").textContent=stato.room_code;$("header-user").textContent=stato.company_name+" · "+stato.room_code;renderGioco();}
-    catch(e){tornaAccesso();msg("access-message","Sessione non più disponibile: "+e.message,true);}
+    catch(e){tornaAccesso(true);msg("access-message","Sessione non più disponibile: "+e.message,true);}
   }else show("access-view");
 }
 
