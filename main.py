@@ -2,7 +2,7 @@
 Interfaccia web del Business Game.
 Questo file integra:
 1. Validazione preventiva degli errori delle leve nel frontend (main.py) prima dell'invio al server.
-2. Pop-up di conferma prima di uscire dalla partita (pulsante Esci, chiusura scheda e tasto Indietro su smartphone).
+2. Pop-up di conferma persistente ad OGNI pressione del tasto Indietro su smartphone (senza limiti di volte).
 
 Avvio locale:
     python main.py
@@ -658,27 +658,32 @@ async function api(url, method="GET", body=null) {
 
 function msg(id,text,error=false){const el=$(id);el.textContent=text;el.className="message "+(error?"error":"success");}
 
-// MODIFICA MOSTRAMONTO VISTE CON AGGIUNTA STATO CRONOLOGIA MOBILE
+// RIPRISTINO DELLO STATO DELLA CRONOLOGIA OGNI VOLTA CHE SI ENTRA IN UN'AREA DI GIOCO
+function assicuraStatoCronologia() {
+  if (stato.room_code) {
+    history.pushState({ inGame: true }, "", window.location.href);
+  }
+}
+
 function show(id){
   ["access-view","admin-view","game-view"].forEach(x=>$(x).classList.add("hidden"));
   $(id).classList.remove("hidden");
   
   if (id === "admin-view" || id === "game-view") {
-    // Inserisce uno stato fittizio nella cronologia del browser
-    history.pushState({ inGame: true }, "");
+    assicuraStatoCronologia();
   }
 }
 
 function salvaSessione(){sessionStorage.setItem("business-game-session",JSON.stringify(stato));}
 function caricaSessione(){try{const x=JSON.parse(sessionStorage.getItem("business-game-session")||"null");if(x)stato=x;}catch(e){}}
 
-// FUNZIONE PER L'USCITA CON CONFERMA TRAMITE POP-UP (PULSANTE ESCI E tasto INDIETRO MOBILE)
+// FUNZIONE DI USCITA: SE ANNULLATA, RIGENERA IMMEDIATAMENTE LO STATO NELLA CRONOLOGIA
 function tornaAccesso(force = false){
   if (!force) {
     const conferma = confirm("Sei sicuro di voler uscire dalla partita?");
     if (!conferma) {
-      // Se l'utente annulla l'uscita da smartphone, ripristiniamo lo stato della cronologia
-      history.pushState({ inGame: true }, "");
+      // Se l'utente clicca Annulla, si riaggiunge subito lo stato per bloccare il prossimo "Indietro"
+      assicuraStatoCronologia();
       return false;
     }
   }
@@ -690,7 +695,7 @@ function tornaAccesso(force = false){
   return true;
 }
 
-// GESTIONE PULSANTE INDIETRO (GESTURE / FISICO) SU SMARTPHONE
+// INTERCETTAZIONI NATIVE PER SMARTPHONE (POPSTATE BLOCCANTE INFINITO)
 window.addEventListener("popstate", function (e) {
   if (stato.room_code) {
     tornaAccesso();
@@ -826,7 +831,7 @@ function validaLevePreventiva(decisions) {
 
   const finanziamento = num("Finanza_Richiesta di finanziamento");
   const acquistoMP = num("Approvvigionamento_Quantità");
-  const personale = Math.max(0, Number(decisions["Risorse umane_Personale attuale"] || stato.personnel || 0));
+  const personale = Math.max(0, Number(decisions["Risorse umane_Personaleattuale"] || stato.personnel || 0));
   const straordinari = num("Risorse umane_Straordinari");
 
   const invRicercaA = num("Ricerca e sviluppo_Prodotto A_Ricerca prodotto");
@@ -888,7 +893,7 @@ async function inviaDecisioni(ev){
   ev.preventDefault();
   try{
     const decisions=formObject($("decisions-form"));
-    decisions["Risorse umane_Personale attuale"]=String(stato.personnel);
+    decisions["Risorse umane_Personaleattuale"]=String(stato.personnel);
 
     // ESECUZIONE CONTROLLO PREVENTIVO IN FRONTEND
     const erroreValidazione = validaLevePreventiva(decisions);
